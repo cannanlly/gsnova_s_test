@@ -1,0 +1,52 @@
+{
+	"ImportPath": "github.com/yinqiwen/gsnova/remote/paas",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
+	"Deps": [
+		{
+			"ImportPath": "github.com/codahale/chacha20",
+			"Rev": "ec07b4f69a3f70b1dd2a8ad77230deb1ba5d6953"
+		},
+		{
+			"ImportPath": "github.com/getlantern/netx",
+			"Rev": "70375a276c57e76c1fe1e2fbdb4c2d2714a67b39"
+		},
+		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Comment": "v1.0.0-21-g2d1e454",
+			"Rev": "2d1e4548da234d9cb742cc3628556fef86aafbac"
+		},
+		{
+			"ImportPath": "github.com/yinqiwen/gotoolkit/ots",
+			"Rev": "23acd6b1d73447b5b3761847b827fdb6626d712d"
+		},
+		{
+			"ImportPath": "github.com/yinqiwen/gsnova/common/event",
+			"Comment": "v0.25.1",
+			"Rev": "987408d85de5a4785abe1836793943917f09fe30"
+		},
+		{
+			"ImportPath": "github.com/yinqiwen/gsnova/common/helper",
+			"Comment": "v0.25.1",
+			"Rev": "987408d85de5a4785abe1836793943917f09fe30"
+		},
+		{
+			"ImportPath": "github.com/yinqiwen/gsnova/common/logger",
+			"Comment": "v0.25.1",
+			"Rev": "987408d85de5a4785abe1836793943917f09fe30"
+		},
+		{
+			"ImportPath": "github.com/yinqiwen/gsnova/remote",
+			"Comment": "v0.25.1",
+			"Rev": "987408d85de5a4785abe1836793943917f09fe30"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/salsa20",
+			"Rev": "81372b2fc2f10bef2a7f338da115c315a56b2726"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
+			"Rev": "81372b2fc2f10bef2a7f338da115c315a56b2726"
+		}
+	]
+}

@@ -22,31 +22,31 @@
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/event",
-			"Comment": "v0.26.0",
-			"Rev": "7a15896aac306e5cea542872894d3b4a8ec13dc6"
+			"Comment": "v0.26.1",
+			"Rev": "cd233a0c3eaf0f6ad0008c47e075fd8611f09f38"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/helper",
-			"Comment": "v0.26.0",
-			"Rev": "7a15896aac306e5cea542872894d3b4a8ec13dc6"
+			"Comment": "v0.26.1",
+			"Rev": "cd233a0c3eaf0f6ad0008c47e075fd8611f09f38"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/logger",
-			"Comment": "v0.26.0",
-			"Rev": "7a15896aac306e5cea542872894d3b4a8ec13dc6"
+			"Comment": "v0.26.1",
+			"Rev": "cd233a0c3eaf0f6ad0008c47e075fd8611f09f38"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/remote",
-			"Comment": "v0.26.0",
-			"Rev": "7a15896aac306e5cea542872894d3b4a8ec13dc6"
+			"Comment": "v0.26.1",
+			"Rev": "cd233a0c3eaf0f6ad0008c47e075fd8611f09f38"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20",
-			"Rev": "7682e7e3945130cf3cde089834664f68afdd1523"
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "7682e7e3945130cf3cde089834664f68afdd1523"
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
 		}
 	]
 }

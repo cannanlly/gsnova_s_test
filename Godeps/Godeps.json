@@ -13,8 +13,8 @@
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
-			"Comment": "v1.0.0-21-g2d1e454",
-			"Rev": "2d1e4548da234d9cb742cc3628556fef86aafbac"
+			"Comment": "v1.0.0-32-g0b847f2",
+			"Rev": "0b847f2facc24ec406130a05bb1bb72d41993b05"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gotoolkit/ots",
@@ -22,31 +22,31 @@
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/event",
-			"Comment": "v0.26.2",
-			"Rev": "878be1385bc4db1e2bbdd6e9dc113c0031079c67"
+			"Comment": "v0.26.3",
+			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/helper",
-			"Comment": "v0.26.2",
-			"Rev": "878be1385bc4db1e2bbdd6e9dc113c0031079c67"
+			"Comment": "v0.26.3",
+			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/logger",
-			"Comment": "v0.26.2",
-			"Rev": "878be1385bc4db1e2bbdd6e9dc113c0031079c67"
+			"Comment": "v0.26.3",
+			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/remote",
-			"Comment": "v0.26.2",
-			"Rev": "878be1385bc4db1e2bbdd6e9dc113c0031079c67"
+			"Comment": "v0.26.3",
+			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "3c0d69f1777220f1a1d2ec373cb94a282f03eb42"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "3c0d69f1777220f1a1d2ec373cb94a282f03eb42"
 		}
 	]
 }

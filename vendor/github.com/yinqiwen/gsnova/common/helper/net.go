@@ -22,6 +22,13 @@ var ErrTLSIncomplete = errors.New("TLS header incomplete")
 var ErrNoSNI = errors.New("No SNI in protocol")
 var ErrTLSClientHello = errors.New("Invalid tls client hello")
 
+type ProxyChannelConnection interface {
+	io.ReadWriteCloser
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+	SetDeadline(t time.Time) error
+}
+
 func TLSReplaceSNI(data []byte, sni string) ([]byte, string, error) {
 	name, offset, err := tlsParseSNI(data)
 	if nil == err {
@@ -226,7 +233,7 @@ func IsPrivateIP(ip string) bool {
 }
 
 func HTTPProxyConnect(proxyURL *url.URL, c net.Conn, addr string) error {
-	connReq, err := http.NewRequest("Connect", addr, nil)
+	connReq, err := http.NewRequest("CONNECT", "//"+addr, nil)
 	if err != nil {
 		return err
 	}
@@ -245,7 +252,7 @@ func HTTPProxyConnect(proxyURL *url.URL, c net.Conn, addr string) error {
 		connRes.Body.Close()
 	}
 	if connRes.StatusCode >= 300 {
-		return fmt.Errorf("Invalid Connect response:%d", connRes.StatusCode)
+		return fmt.Errorf("Invalid Connect response:%d %v %v", connRes.StatusCode, connRes, connReq)
 	}
 	return nil
 }

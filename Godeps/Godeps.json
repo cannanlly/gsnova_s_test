@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/yinqiwen/gsnova/remote/paas",
-	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GoVersion": "go1.8",
+	"GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/codahale/chacha20",
@@ -9,44 +9,56 @@
 		},
 		{
 			"ImportPath": "github.com/getlantern/netx",
-			"Rev": "70375a276c57e76c1fe1e2fbdb4c2d2714a67b39"
+			"Rev": "c704f69db48c8406d722f6e9ea9b0ad266975fe6"
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
-			"Comment": "v1.0.0-32-g0b847f2",
-			"Rev": "0b847f2facc24ec406130a05bb1bb72d41993b05"
+			"Comment": "v1.2.0-6-ga69d9f6",
+			"Rev": "a69d9f6de432e2c6b296a947d8a5ee88f68522cf"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gotoolkit/ots",
-			"Rev": "23acd6b1d73447b5b3761847b827fdb6626d712d"
+			"Rev": "381462f6f1ae2491e8154687fa24d9f9e371bd65"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/event",
-			"Comment": "v0.26.3",
-			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
+			"Comment": "v0.26.4",
+			"Rev": "13c0f0e60c873c15aaf260343e0ac2d73552a5f1"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/helper",
-			"Comment": "v0.26.3",
-			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
+			"Comment": "v0.26.4",
+			"Rev": "13c0f0e60c873c15aaf260343e0ac2d73552a5f1"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/common/logger",
-			"Comment": "v0.26.3",
-			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
+			"Comment": "v0.26.4",
+			"Rev": "13c0f0e60c873c15aaf260343e0ac2d73552a5f1"
 		},
 		{
 			"ImportPath": "github.com/yinqiwen/gsnova/remote",
-			"Comment": "v0.26.3",
-			"Rev": "b2ffd99c4a4f6d8e5b065ef6035c771eed5b76d0"
+			"Comment": "v0.26.4",
+			"Rev": "13c0f0e60c873c15aaf260343e0ac2d73552a5f1"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/chacha20poly1305",
+			"Rev": "558b6879de74bc843225cde5686419267ff707ca"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/chacha20poly1305/internal/chacha20",
+			"Rev": "558b6879de74bc843225cde5686419267ff707ca"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/poly1305",
+			"Rev": "558b6879de74bc843225cde5686419267ff707ca"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20",
-			"Rev": "3c0d69f1777220f1a1d2ec373cb94a282f03eb42"
+			"Rev": "558b6879de74bc843225cde5686419267ff707ca"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "3c0d69f1777220f1a1d2ec373cb94a282f03eb42"
+			"Rev": "558b6879de74bc843225cde5686419267ff707ca"
 		}
 	]
 }

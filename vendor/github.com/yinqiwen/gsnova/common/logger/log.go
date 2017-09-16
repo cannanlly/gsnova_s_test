@@ -6,8 +6,25 @@ import (
 	"log"
 	"os"
 	"strings"
+	//"github.com/fatih/color"
 	//"syscall"
 )
+
+type colorConsoleWriter struct {
+	prefix  string
+	postfix string
+	w       *os.File
+}
+
+func (writer *colorConsoleWriter) Write(p []byte) (n int, err error) {
+	if len(writer.prefix) > 0 {
+		fmt.Fprint(writer.w, writer.prefix)
+		n, err = writer.w.Write(p)
+		fmt.Fprint(writer.w, writer.postfix)
+		return
+	}
+	return writer.w.Write(p)
+}
 
 type logFileWriter struct {
 	path string
@@ -58,25 +75,88 @@ func IsDebugEnable() bool {
 }
 
 func InitLogger(output []string) {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	ws := make([]io.Writer, 0)
 	for _, name := range output {
 		if strings.EqualFold(name, "stdout") {
 			ws = append(ws, os.Stdout)
-		} else if strings.EqualFold(name, "stderr") {
-			ws = append(ws, os.Stderr)
+			withFile = true
+		} else if strings.EqualFold(name, "console") {
+			ws = append(ws, os.Stdout)
+			withFile = true
+		} else if strings.EqualFold(name, "color") {
+			//ws = append(ws, os.Stderr)
+			withColorConsole = true
 		} else {
 			ws = append(ws, initLogWriter(name))
+			withFile = true
 		}
 	}
 	if len(ws) > 0 {
-		logWriter = io.MultiWriter(ws...)
-		log.SetOutput(logWriter)
+		log.SetOutput(io.MultiWriter(ws...))
 	}
 }
 
-var logWriter io.Writer
+var withColorConsole bool
+var withFile bool
+var colorConsoleLogger *log.Logger
 
-func GetLoggerWriter() io.Writer {
-	return logWriter
+func Debug(format string, v ...interface{}) {
+	if withFile {
+		log.Output(2, fmt.Sprintf(format, v...))
+	}
+	if withColorConsole {
+		colorConsoleLogger.Output(2, fmt.Sprintf(format, v...))
+	}
+
+}
+func Notice(format string, v ...interface{}) {
+	if withFile {
+		log.Output(2, fmt.Sprintf(format, v...))
+	}
+	if withColorConsole {
+		setNoticeColor()
+		colorConsoleLogger.Output(2, fmt.Sprintf(format, v...))
+		unsetNoticeColor()
+	}
+}
+
+func Info(format string, v ...interface{}) {
+	if withFile {
+		log.Output(2, fmt.Sprintf(format, v...))
+	}
+
+	if withColorConsole {
+		setINFOColor()
+		colorConsoleLogger.Output(2, fmt.Sprintf(format, v...))
+		unsetINFOColor()
+	}
+}
+
+func Error(format string, v ...interface{}) {
+	if withFile {
+		log.Output(2, fmt.Sprintf(format, v...))
+	}
+	if withColorConsole {
+		setErrorColor()
+		colorConsoleLogger.Output(2, fmt.Sprintf(format, v...))
+		unsetErrorColor()
+	}
+}
+
+func Fatal(format string, v ...interface{}) {
+	if withFile {
+		log.Output(2, fmt.Sprintf(format, v...))
+	}
+	if withColorConsole {
+		setErrorColor()
+		colorConsoleLogger.Output(2, fmt.Sprintf(format, v...))
+		unsetErrorColor()
+	}
+	os.Exit(1)
+}
+
+func init() {
+	logFlag := log.LstdFlags | log.Lshortfile
+	log.SetFlags(logFlag)
+	colorConsoleLogger = log.New(&colorConsoleWriter{w: os.Stdout}, "", logFlag)
 }

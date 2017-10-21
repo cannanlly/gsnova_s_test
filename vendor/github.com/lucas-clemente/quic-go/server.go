@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go/crypto"
-	"github.com/lucas-clemente/quic-go/handshake"
+	"github.com/lucas-clemente/quic-go/internal/crypto"
+	"github.com/lucas-clemente/quic-go/internal/handshake"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/internal/wire"
@@ -94,11 +94,11 @@ func Listen(conn net.PacketConn, tlsConf *tls.Config, config *Config) (Listener,
 	return s, nil
 }
 
-var defaultAcceptSTK = func(clientAddr net.Addr, stk *STK) bool {
-	if stk == nil {
+var defaultAcceptCookie = func(clientAddr net.Addr, cookie *Cookie) bool {
+	if cookie == nil {
 		return false
 	}
-	if time.Now().After(stk.sentTime.Add(protocol.STKExpiryTime)) {
+	if time.Now().After(cookie.SentTime.Add(protocol.CookieExpiryTime)) {
 		return false
 	}
 	var sourceAddr string
@@ -107,7 +107,7 @@ var defaultAcceptSTK = func(clientAddr net.Addr, stk *STK) bool {
 	} else {
 		sourceAddr = clientAddr.String()
 	}
-	return sourceAddr == stk.remoteAddr
+	return sourceAddr == cookie.RemoteAddr
 }
 
 // populateServerConfig populates fields in the quic.Config with their default values, if none are set
@@ -121,9 +121,9 @@ func populateServerConfig(config *Config) *Config {
 		versions = protocol.SupportedVersions
 	}
 
-	vsa := defaultAcceptSTK
-	if config.AcceptSTK != nil {
-		vsa = config.AcceptSTK
+	vsa := defaultAcceptCookie
+	if config.AcceptCookie != nil {
+		vsa = config.AcceptCookie
 	}
 
 	handshakeTimeout := protocol.DefaultHandshakeTimeout
@@ -148,7 +148,8 @@ func populateServerConfig(config *Config) *Config {
 		Versions:                              versions,
 		HandshakeTimeout:                      handshakeTimeout,
 		IdleTimeout:                           idleTimeout,
-		AcceptSTK:                             vsa,
+		AcceptCookie:                          vsa,
+		KeepAlive:                             config.KeepAlive,
 		MaxReceiveStreamFlowControlWindow:     maxReceiveStreamFlowControlWindow,
 		MaxReceiveConnectionFlowControlWindow: maxReceiveConnectionFlowControlWindow,
 	}
@@ -271,7 +272,7 @@ func (s *server) handlePacket(pconn net.PacketConn, remoteAddr net.Addr, packet 
 		if len(packet) < protocol.ClientHelloMinimumSize+len(hdr.Raw) {
 			return errors.New("dropping small packet with unknown version")
 		}
-		utils.Infof("Client offered version %d, sending VersionNegotiationPacket", hdr.VersionNumber)
+		utils.Infof("Client offered version %s, sending VersionNegotiationPacket", hdr.VersionNumber)
 		_, err = pconn.WriteTo(wire.ComposeVersionNegotiation(hdr.ConnectionID, s.config.Versions), remoteAddr)
 		return err
 	}
@@ -282,7 +283,7 @@ func (s *server) handlePacket(pconn net.PacketConn, remoteAddr net.Addr, packet 
 			return errors.New("Server BUG: negotiated version not supported")
 		}
 
-		utils.Infof("Serving new connection: %x, version %d from %v", hdr.ConnectionID, version, remoteAddr)
+		utils.Infof("Serving new connection: %x, version %s from %v", hdr.ConnectionID, version, remoteAddr)
 		var handshakeChan <-chan handshakeEvent
 		session, handshakeChan, err = s.newSession(
 			&conn{pconn: pconn, currentAddr: remoteAddr},

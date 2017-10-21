@@ -81,14 +81,11 @@ const SkipPacketAveragePeriodLength PacketNumber = 500
 // MaxTrackedSkippedPackets is the maximum number of skipped packet numbers the SentPacketHandler keep track of for Optimistic ACK attack mitigation
 const MaxTrackedSkippedPackets = 10
 
-// STKExpiryTime is the valid time of a source address token
-const STKExpiryTime = 24 * time.Hour
+// CookieExpiryTime is the valid time of a cookie
+const CookieExpiryTime = 24 * time.Hour
 
 // MaxTrackedSentPackets is maximum number of sent packets saved for either later retransmission or entropy calculation
 const MaxTrackedSentPackets = 2 * DefaultMaxCongestionWindow
-
-// MaxTrackedReceivedPackets is the maximum number of received packets saved for doing the entropy calculations
-const MaxTrackedReceivedPackets = 2 * DefaultMaxCongestionWindow
 
 // MaxTrackedReceivedAckRanges is the maximum number of ACK ranges tracked
 const MaxTrackedReceivedAckRanges = DefaultMaxCongestionWindow
@@ -115,6 +112,9 @@ const CryptoParameterMaxLength = 4000
 
 // EphermalKeyLifetime is the lifetime of the ephermal key during the handshake, see handshake.getEphermalKEX.
 const EphermalKeyLifetime = time.Minute
+
+// MinRemoteIdleTimeout is the minimum value that we accept for the remote idle timeout
+const MinRemoteIdleTimeout = 5 * time.Second
 
 // DefaultIdleTimeout is the default idle timeout
 const DefaultIdleTimeout = 30 * time.Second

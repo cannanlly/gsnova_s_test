@@ -6,15 +6,16 @@ import (
 	"sync"
 
 	"github.com/lucas-clemente/quic-go/congestion"
-	"github.com/lucas-clemente/quic-go/handshake"
+	"github.com/lucas-clemente/quic-go/internal/handshake"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/qerr"
 )
 
 type flowControlManager struct {
-	connectionParameters handshake.ConnectionParametersManager
-	rttStats             *congestion.RTTStats
+	connParams             handshake.ParamsNegotiator
+	rttStats               *congestion.RTTStats
+	maxReceiveStreamWindow protocol.ByteCount
 
 	streamFlowController map[protocol.StreamID]*flowController
 	connFlowController   *flowController
@@ -26,12 +27,18 @@ var _ FlowControlManager = &flowControlManager{}
 var errMapAccess = errors.New("Error accessing the flowController map.")
 
 // NewFlowControlManager creates a new flow control manager
-func NewFlowControlManager(connectionParameters handshake.ConnectionParametersManager, rttStats *congestion.RTTStats) FlowControlManager {
+func NewFlowControlManager(
+	connParams handshake.ParamsNegotiator,
+	maxReceiveStreamWindow protocol.ByteCount,
+	maxReceiveConnectionWindow protocol.ByteCount,
+	rttStats *congestion.RTTStats,
+) FlowControlManager {
 	return &flowControlManager{
-		connectionParameters: connectionParameters,
-		rttStats:             rttStats,
-		streamFlowController: make(map[protocol.StreamID]*flowController),
-		connFlowController:   newFlowController(0, false, connectionParameters, rttStats),
+		connParams:             connParams,
+		rttStats:               rttStats,
+		maxReceiveStreamWindow: maxReceiveStreamWindow,
+		streamFlowController:   make(map[protocol.StreamID]*flowController),
+		connFlowController:     newFlowController(0, false, connParams, maxReceiveConnectionWindow, rttStats),
 	}
 }
 
@@ -44,8 +51,7 @@ func (f *flowControlManager) NewStream(streamID protocol.StreamID, contributesTo
 	if _, ok := f.streamFlowController[streamID]; ok {
 		return
 	}
-
-	f.streamFlowController[streamID] = newFlowController(streamID, contributesToConnection, f.connectionParameters, f.rttStats)
+	f.streamFlowController[streamID] = newFlowController(streamID, contributesToConnection, f.connParams, f.maxReceiveStreamWindow, f.rttStats)
 }
 
 // RemoveStream removes a closed stream from flow control

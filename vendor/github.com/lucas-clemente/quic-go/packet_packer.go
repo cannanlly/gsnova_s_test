@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lucas-clemente/quic-go/ackhandler"
-	"github.com/lucas-clemente/quic-go/handshake"
+	"github.com/lucas-clemente/quic-go/internal/handshake"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/wire"
 )
@@ -25,7 +25,7 @@ type packetPacker struct {
 	cryptoSetup  handshake.CryptoSetup
 
 	packetNumberGenerator *packetNumberGenerator
-	connectionParameters  handshake.ConnectionParametersManager
+	connParams            handshake.ParamsNegotiator
 	streamFramer          *streamFramer
 
 	controlFrames []wire.Frame
@@ -36,7 +36,7 @@ type packetPacker struct {
 
 func newPacketPacker(connectionID protocol.ConnectionID,
 	cryptoSetup handshake.CryptoSetup,
-	connectionParameters handshake.ConnectionParametersManager,
+	connParams handshake.ParamsNegotiator,
 	streamFramer *streamFramer,
 	perspective protocol.Perspective,
 	version protocol.VersionNumber,
@@ -44,7 +44,7 @@ func newPacketPacker(connectionID protocol.ConnectionID,
 	return &packetPacker{
 		cryptoSetup:           cryptoSetup,
 		connectionID:          connectionID,
-		connectionParameters:  connectionParameters,
+		connParams:            connParams,
 		perspective:           perspective,
 		version:               version,
 		streamFramer:          streamFramer,
@@ -268,10 +268,10 @@ func (p *packetPacker) getPublicHeader(encLevel protocol.EncryptionLevel) *wire.
 	pnum := p.packetNumberGenerator.Peek()
 	packetNumberLen := protocol.GetPacketNumberLengthForPublicHeader(pnum, p.leastUnacked)
 	publicHeader := &wire.PublicHeader{
-		ConnectionID:         p.connectionID,
-		PacketNumber:         pnum,
-		PacketNumberLen:      packetNumberLen,
-		TruncateConnectionID: p.connectionParameters.TruncateConnectionID(),
+		ConnectionID:     p.connectionID,
+		PacketNumber:     pnum,
+		PacketNumberLen:  packetNumberLen,
+		OmitConnectionID: p.connParams.OmitConnectionID(),
 	}
 
 	if p.perspective == protocol.PerspectiveServer && encLevel == protocol.EncryptionSecure {

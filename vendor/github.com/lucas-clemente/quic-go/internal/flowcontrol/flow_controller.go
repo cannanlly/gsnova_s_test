@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lucas-clemente/quic-go/congestion"
-	"github.com/lucas-clemente/quic-go/handshake"
+	"github.com/lucas-clemente/quic-go/internal/handshake"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/utils"
 )
@@ -14,8 +14,8 @@ type flowController struct {
 	streamID                protocol.StreamID
 	contributesToConnection bool // does the stream contribute to connection level flow control
 
-	connectionParameters handshake.ConnectionParametersManager
-	rttStats             *congestion.RTTStats
+	connParams handshake.ParamsNegotiator
+	rttStats   *congestion.RTTStats
 
 	bytesSent  protocol.ByteCount
 	sendWindow protocol.ByteCount
@@ -33,22 +33,27 @@ type flowController struct {
 var ErrReceivedSmallerByteOffset = errors.New("Received a smaller byte offset")
 
 // newFlowController gets a new flow controller
-func newFlowController(streamID protocol.StreamID, contributesToConnection bool, connectionParameters handshake.ConnectionParametersManager, rttStats *congestion.RTTStats) *flowController {
+func newFlowController(
+	streamID protocol.StreamID,
+	contributesToConnection bool,
+	connParams handshake.ParamsNegotiator,
+	maxReceiveWindow protocol.ByteCount,
+	rttStats *congestion.RTTStats,
+) *flowController {
 	fc := flowController{
-		streamID:                streamID,
-		contributesToConnection: contributesToConnection,
-		connectionParameters:    connectionParameters,
-		rttStats:                rttStats,
+		streamID:                  streamID,
+		contributesToConnection:   contributesToConnection,
+		connParams:                connParams,
+		rttStats:                  rttStats,
+		maxReceiveWindowIncrement: maxReceiveWindow,
 	}
 
 	if streamID == 0 {
-		fc.receiveWindow = connectionParameters.GetReceiveConnectionFlowControlWindow()
+		fc.receiveWindow = connParams.GetReceiveConnectionFlowControlWindow()
 		fc.receiveWindowIncrement = fc.receiveWindow
-		fc.maxReceiveWindowIncrement = connectionParameters.GetMaxReceiveConnectionFlowControlWindow()
 	} else {
-		fc.receiveWindow = connectionParameters.GetReceiveStreamFlowControlWindow()
+		fc.receiveWindow = connParams.GetReceiveStreamFlowControlWindow()
 		fc.receiveWindowIncrement = fc.receiveWindow
-		fc.maxReceiveWindowIncrement = connectionParameters.GetMaxReceiveStreamFlowControlWindow()
 	}
 
 	return &fc
@@ -61,9 +66,9 @@ func (c *flowController) ContributesToConnection() bool {
 func (c *flowController) getSendWindow() protocol.ByteCount {
 	if c.sendWindow == 0 {
 		if c.streamID == 0 {
-			return c.connectionParameters.GetSendConnectionFlowControlWindow()
+			return c.connParams.GetSendConnectionFlowControlWindow()
 		}
-		return c.connectionParameters.GetSendStreamFlowControlWindow()
+		return c.connParams.GetSendStreamFlowControlWindow()
 	}
 	return c.sendWindow
 }

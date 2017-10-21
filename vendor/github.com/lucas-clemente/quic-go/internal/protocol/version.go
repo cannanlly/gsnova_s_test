@@ -1,13 +1,13 @@
 package protocol
 
+import "fmt"
+
 // VersionNumber is a version number as int
 type VersionNumber int
 
 // The version numbers, making grepping easier
 const (
-	Version35 VersionNumber = 35 + iota
-	Version36
-	Version37
+	Version37 VersionNumber = 37 + iota
 	Version38
 	Version39
 	VersionTLS         VersionNumber = 101
@@ -22,8 +22,26 @@ var SupportedVersions = []VersionNumber{
 	Version39,
 	Version38,
 	Version37,
-	Version36,
-	Version35,
+}
+
+// UsesTLS says if this QUIC version uses TLS 1.3 for the handshake
+func (vn VersionNumber) UsesTLS() bool {
+	return vn == VersionTLS
+}
+
+func (vn VersionNumber) String() string {
+	switch vn {
+	case VersionWhatever:
+		return "whatever"
+	case VersionUnsupported:
+		return "unsupported"
+	case VersionUnknown:
+		return "unknown"
+	case VersionTLS:
+		return "TLS dev version (WIP)"
+	default:
+		return fmt.Sprintf("%d", vn)
+	}
 }
 
 // VersionNumberToTag maps version numbers ('32') to tags ('Q032')

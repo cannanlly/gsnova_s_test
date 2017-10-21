@@ -12,21 +12,15 @@ import (
 type receivedPacketHistory struct {
 	ranges *utils.PacketIntervalList
 
-	// the map is used as a replacement for a set here. The bool is always supposed to be set to true
-	receivedPacketNumbers         map[protocol.PacketNumber]bool
 	lowestInReceivedPacketNumbers protocol.PacketNumber
 }
 
-var (
-	errTooManyOutstandingReceivedAckRanges = qerr.Error(qerr.TooManyOutstandingReceivedPackets, "Too many outstanding received ACK ranges")
-	errTooManyOutstandingReceivedPackets   = qerr.Error(qerr.TooManyOutstandingReceivedPackets, "Too many outstanding received packets")
-)
+var errTooManyOutstandingReceivedAckRanges = qerr.Error(qerr.TooManyOutstandingReceivedPackets, "Too many outstanding received ACK ranges")
 
 // newReceivedPacketHistory creates a new received packet history
 func newReceivedPacketHistory() *receivedPacketHistory {
 	return &receivedPacketHistory{
-		ranges:                utils.NewPacketIntervalList(),
-		receivedPacketNumbers: make(map[protocol.PacketNumber]bool),
+		ranges: utils.NewPacketIntervalList(),
 	}
 }
 
@@ -35,12 +29,6 @@ func (h *receivedPacketHistory) ReceivedPacket(p protocol.PacketNumber) error {
 	if h.ranges.Len() >= protocol.MaxTrackedReceivedAckRanges {
 		return errTooManyOutstandingReceivedAckRanges
 	}
-
-	if len(h.receivedPacketNumbers) >= protocol.MaxTrackedReceivedPackets {
-		return errTooManyOutstandingReceivedPackets
-	}
-
-	h.receivedPacketNumbers[p] = true
 
 	if h.ranges.Len() == 0 {
 		h.ranges.PushBack(utils.PacketInterval{Start: p, End: p})
@@ -95,30 +83,13 @@ func (h *receivedPacketHistory) DeleteUpTo(p protocol.PacketNumber) {
 		nextEl = el.Next()
 
 		if p >= el.Value.Start && p < el.Value.End {
-			for i := el.Value.Start; i <= p; i++ { // adjust start value of a range
-				delete(h.receivedPacketNumbers, i)
-			}
 			el.Value.Start = p + 1
 		} else if el.Value.End <= p { // delete a whole range
-			for i := el.Value.Start; i <= el.Value.End; i++ {
-				delete(h.receivedPacketNumbers, i)
-			}
 			h.ranges.Remove(el)
 		} else { // no ranges affected. Nothing to do
 			return
 		}
 	}
-}
-
-// IsDuplicate determines if a packet should be regarded as a duplicate packet
-// note that after receiving a StopWaitingFrame, all packets below the LeastUnacked should be regarded as duplicates, even if the packet was just delayed
-func (h *receivedPacketHistory) IsDuplicate(p protocol.PacketNumber) bool {
-	if p < h.lowestInReceivedPacketNumbers {
-		return true
-	}
-
-	_, ok := h.receivedPacketNumbers[p]
-	return ok
 }
 
 // GetAckRanges gets a slice of all AckRanges that can be used in an AckFrame
@@ -127,12 +98,12 @@ func (h *receivedPacketHistory) GetAckRanges() []wire.AckRange {
 		return nil
 	}
 
-	var ackRanges []wire.AckRange
-
+	ackRanges := make([]wire.AckRange, h.ranges.Len())
+	i := 0
 	for el := h.ranges.Back(); el != nil; el = el.Prev() {
-		ackRanges = append(ackRanges, wire.AckRange{FirstPacketNumber: el.Value.Start, LastPacketNumber: el.Value.End})
+		ackRanges[i] = wire.AckRange{First: el.Value.Start, Last: el.Value.End}
+		i++
 	}
-
 	return ackRanges
 }
 
@@ -140,8 +111,8 @@ func (h *receivedPacketHistory) GetHighestAckRange() wire.AckRange {
 	ackRange := wire.AckRange{}
 	if h.ranges.Len() > 0 {
 		r := h.ranges.Back().Value
-		ackRange.FirstPacketNumber = r.Start
-		ackRange.LastPacketNumber = r.End
+		ackRange.First = r.Start
+		ackRange.Last = r.End
 	}
 	return ackRange
 }

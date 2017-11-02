@@ -12,7 +12,7 @@ import (
 )
 
 type packedPacket struct {
-	number          protocol.PacketNumber
+	header          *wire.Header
 	raw             []byte
 	frames          []wire.Frame
 	encryptionLevel protocol.EncryptionLevel
@@ -25,18 +25,17 @@ type packetPacker struct {
 	cryptoSetup  handshake.CryptoSetup
 
 	packetNumberGenerator *packetNumberGenerator
-	connParams            handshake.ParamsNegotiator
 	streamFramer          *streamFramer
 
-	controlFrames []wire.Frame
-	stopWaiting   *wire.StopWaitingFrame
-	ackFrame      *wire.AckFrame
-	leastUnacked  protocol.PacketNumber
+	controlFrames    []wire.Frame
+	stopWaiting      *wire.StopWaitingFrame
+	ackFrame         *wire.AckFrame
+	leastUnacked     protocol.PacketNumber
+	omitConnectionID bool
 }
 
 func newPacketPacker(connectionID protocol.ConnectionID,
 	cryptoSetup handshake.CryptoSetup,
-	connParams handshake.ParamsNegotiator,
 	streamFramer *streamFramer,
 	perspective protocol.Perspective,
 	version protocol.VersionNumber,
@@ -44,7 +43,6 @@ func newPacketPacker(connectionID protocol.ConnectionID,
 	return &packetPacker{
 		cryptoSetup:           cryptoSetup,
 		connectionID:          connectionID,
-		connParams:            connParams,
 		perspective:           perspective,
 		version:               version,
 		streamFramer:          streamFramer,
@@ -56,10 +54,10 @@ func newPacketPacker(connectionID protocol.ConnectionID,
 func (p *packetPacker) PackConnectionClose(ccf *wire.ConnectionCloseFrame) (*packedPacket, error) {
 	frames := []wire.Frame{ccf}
 	encLevel, sealer := p.cryptoSetup.GetSealer()
-	ph := p.getPublicHeader(encLevel)
-	raw, err := p.writeAndSealPacket(ph, frames, sealer)
+	header := p.getHeader(encLevel)
+	raw, err := p.writeAndSealPacket(header, frames, sealer)
 	return &packedPacket{
-		number:          ph.PacketNumber,
+		header:          header,
 		raw:             raw,
 		frames:          frames,
 		encryptionLevel: encLevel,
@@ -71,18 +69,18 @@ func (p *packetPacker) PackAckPacket() (*packedPacket, error) {
 		return nil, errors.New("packet packer BUG: no ack frame queued")
 	}
 	encLevel, sealer := p.cryptoSetup.GetSealer()
-	ph := p.getPublicHeader(encLevel)
+	header := p.getHeader(encLevel)
 	frames := []wire.Frame{p.ackFrame}
 	if p.stopWaiting != nil {
-		p.stopWaiting.PacketNumber = ph.PacketNumber
-		p.stopWaiting.PacketNumberLen = ph.PacketNumberLen
+		p.stopWaiting.PacketNumber = header.PacketNumber
+		p.stopWaiting.PacketNumberLen = header.PacketNumberLen
 		frames = append(frames, p.stopWaiting)
 		p.stopWaiting = nil
 	}
 	p.ackFrame = nil
-	raw, err := p.writeAndSealPacket(ph, frames, sealer)
+	raw, err := p.writeAndSealPacket(header, frames, sealer)
 	return &packedPacket{
-		number:          ph.PacketNumber,
+		header:          header,
 		raw:             raw,
 		frames:          frames,
 		encryptionLevel: encLevel,
@@ -101,14 +99,14 @@ func (p *packetPacker) PackHandshakeRetransmission(packet *ackhandler.Packet) (*
 	if p.stopWaiting == nil {
 		return nil, errors.New("PacketPacker BUG: Handshake retransmissions must contain a StopWaitingFrame")
 	}
-	ph := p.getPublicHeader(packet.EncryptionLevel)
-	p.stopWaiting.PacketNumber = ph.PacketNumber
-	p.stopWaiting.PacketNumberLen = ph.PacketNumberLen
+	header := p.getHeader(packet.EncryptionLevel)
+	p.stopWaiting.PacketNumber = header.PacketNumber
+	p.stopWaiting.PacketNumberLen = header.PacketNumberLen
 	frames := append([]wire.Frame{p.stopWaiting}, packet.Frames...)
 	p.stopWaiting = nil
-	raw, err := p.writeAndSealPacket(ph, frames, sealer)
+	raw, err := p.writeAndSealPacket(header, frames, sealer)
 	return &packedPacket{
-		number:          ph.PacketNumber,
+		header:          header,
 		raw:             raw,
 		frames:          frames,
 		encryptionLevel: packet.EncryptionLevel,
@@ -124,17 +122,17 @@ func (p *packetPacker) PackPacket() (*packedPacket, error) {
 
 	encLevel, sealer := p.cryptoSetup.GetSealer()
 
-	publicHeader := p.getPublicHeader(encLevel)
-	publicHeaderLength, err := publicHeader.GetLength(p.perspective)
+	header := p.getHeader(encLevel)
+	headerLength, err := header.GetLength(p.perspective, p.version)
 	if err != nil {
 		return nil, err
 	}
 	if p.stopWaiting != nil {
-		p.stopWaiting.PacketNumber = publicHeader.PacketNumber
-		p.stopWaiting.PacketNumberLen = publicHeader.PacketNumberLen
+		p.stopWaiting.PacketNumber = header.PacketNumber
+		p.stopWaiting.PacketNumberLen = header.PacketNumberLen
 	}
 
-	maxSize := protocol.MaxPacketSize - protocol.ByteCount(sealer.Overhead()) - publicHeaderLength
+	maxSize := protocol.MaxPacketSize - protocol.ByteCount(sealer.Overhead()) - headerLength
 	payloadFrames, err := p.composeNextPacket(maxSize, p.canSendData(encLevel))
 	if err != nil {
 		return nil, err
@@ -151,12 +149,12 @@ func (p *packetPacker) PackPacket() (*packedPacket, error) {
 	p.stopWaiting = nil
 	p.ackFrame = nil
 
-	raw, err := p.writeAndSealPacket(publicHeader, payloadFrames, sealer)
+	raw, err := p.writeAndSealPacket(header, payloadFrames, sealer)
 	if err != nil {
 		return nil, err
 	}
 	return &packedPacket{
-		number:          publicHeader.PacketNumber,
+		header:          header,
 		raw:             raw,
 		frames:          payloadFrames,
 		encryptionLevel: encLevel,
@@ -165,19 +163,19 @@ func (p *packetPacker) PackPacket() (*packedPacket, error) {
 
 func (p *packetPacker) packCryptoPacket() (*packedPacket, error) {
 	encLevel, sealer := p.cryptoSetup.GetSealerForCryptoStream()
-	publicHeader := p.getPublicHeader(encLevel)
-	publicHeaderLength, err := publicHeader.GetLength(p.perspective)
+	header := p.getHeader(encLevel)
+	headerLength, err := header.GetLength(p.perspective, p.version)
 	if err != nil {
 		return nil, err
 	}
-	maxLen := protocol.MaxPacketSize - protocol.ByteCount(sealer.Overhead()) - protocol.NonForwardSecurePacketSizeReduction - publicHeaderLength
+	maxLen := protocol.MaxPacketSize - protocol.ByteCount(sealer.Overhead()) - protocol.NonForwardSecurePacketSizeReduction - headerLength
 	frames := []wire.Frame{p.streamFramer.PopCryptoStreamFrame(maxLen)}
-	raw, err := p.writeAndSealPacket(publicHeader, frames, sealer)
+	raw, err := p.writeAndSealPacket(header, frames, sealer)
 	if err != nil {
 		return nil, err
 	}
 	return &packedPacket{
-		number:          publicHeader.PacketNumber,
+		header:          header,
 		raw:             raw,
 		frames:          frames,
 		encryptionLevel: encLevel,
@@ -264,36 +262,53 @@ func (p *packetPacker) QueueControlFrame(frame wire.Frame) {
 	}
 }
 
-func (p *packetPacker) getPublicHeader(encLevel protocol.EncryptionLevel) *wire.PublicHeader {
+func (p *packetPacker) getHeader(encLevel protocol.EncryptionLevel) *wire.Header {
 	pnum := p.packetNumberGenerator.Peek()
-	packetNumberLen := protocol.GetPacketNumberLengthForPublicHeader(pnum, p.leastUnacked)
-	publicHeader := &wire.PublicHeader{
-		ConnectionID:     p.connectionID,
-		PacketNumber:     pnum,
-		PacketNumberLen:  packetNumberLen,
-		OmitConnectionID: p.connParams.OmitConnectionID(),
+	packetNumberLen := protocol.GetPacketNumberLengthForHeader(pnum, p.leastUnacked)
+
+	var isLongHeader bool
+	if p.version.UsesTLS() && encLevel != protocol.EncryptionForwardSecure {
+		// TODO: set the Long Header type
+		packetNumberLen = protocol.PacketNumberLen4
+		isLongHeader = true
 	}
 
-	if p.perspective == protocol.PerspectiveServer && encLevel == protocol.EncryptionSecure {
-		publicHeader.DiversificationNonce = p.cryptoSetup.DiversificationNonce()
-	}
-	if p.perspective == protocol.PerspectiveClient && encLevel != protocol.EncryptionForwardSecure {
-		publicHeader.VersionFlag = true
-		publicHeader.VersionNumber = p.version
+	header := &wire.Header{
+		ConnectionID:    p.connectionID,
+		PacketNumber:    pnum,
+		PacketNumberLen: packetNumberLen,
+		IsLongHeader:    isLongHeader,
 	}
 
-	return publicHeader
+	if p.omitConnectionID && encLevel == protocol.EncryptionForwardSecure {
+		header.OmitConnectionID = true
+	}
+	if !p.version.UsesTLS() {
+		if p.perspective == protocol.PerspectiveServer && encLevel == protocol.EncryptionSecure {
+			header.DiversificationNonce = p.cryptoSetup.DiversificationNonce()
+		}
+		if p.perspective == protocol.PerspectiveClient && encLevel != protocol.EncryptionForwardSecure {
+			header.VersionFlag = true
+			header.Version = p.version
+		}
+	} else {
+		header.Type = p.cryptoSetup.GetNextPacketType()
+		if encLevel != protocol.EncryptionForwardSecure {
+			header.Version = p.version
+		}
+	}
+	return header
 }
 
 func (p *packetPacker) writeAndSealPacket(
-	publicHeader *wire.PublicHeader,
+	header *wire.Header,
 	payloadFrames []wire.Frame,
 	sealer handshake.Sealer,
 ) ([]byte, error) {
 	raw := getPacketBuffer()
 	buffer := bytes.NewBuffer(raw)
 
-	if err := publicHeader.Write(buffer, p.version, p.perspective); err != nil {
+	if err := header.Write(buffer, p.perspective, p.version); err != nil {
 		return nil, err
 	}
 	payloadStartIndex := buffer.Len()
@@ -308,11 +323,11 @@ func (p *packetPacker) writeAndSealPacket(
 	}
 
 	raw = raw[0:buffer.Len()]
-	_ = sealer.Seal(raw[payloadStartIndex:payloadStartIndex], raw[payloadStartIndex:], publicHeader.PacketNumber, raw[:payloadStartIndex])
+	_ = sealer.Seal(raw[payloadStartIndex:payloadStartIndex], raw[payloadStartIndex:], header.PacketNumber, raw[:payloadStartIndex])
 	raw = raw[0 : buffer.Len()+sealer.Overhead()]
 
 	num := p.packetNumberGenerator.Pop()
-	if num != publicHeader.PacketNumber {
+	if num != header.PacketNumber {
 		return nil, errors.New("packetPacker BUG: Peeked and Popped packet numbers do not match")
 	}
 
@@ -328,4 +343,8 @@ func (p *packetPacker) canSendData(encLevel protocol.EncryptionLevel) bool {
 
 func (p *packetPacker) SetLeastUnacked(leastUnacked protocol.PacketNumber) {
 	p.leastUnacked = leastUnacked
+}
+
+func (p *packetPacker) SetOmitConnectionID() {
+	p.omitConnectionID = true
 }

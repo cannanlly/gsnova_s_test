@@ -21,6 +21,24 @@ const (
 	PacketNumberLen6 PacketNumberLen = 6
 )
 
+// The PacketType is the Long Header Type (only used for the IETF draft header format)
+type PacketType uint8
+
+const (
+	// PacketTypeVersionNegotiation is the packet type of a Version Negotiation packet
+	PacketTypeVersionNegotiation PacketType = 1
+	// PacketTypeClientInitial is the packet type of a Client Initial packet
+	PacketTypeClientInitial PacketType = 2
+	// PacketTypeServerStatelessRetry is the packet type of a Server Stateless Retry packet
+	PacketTypeServerStatelessRetry PacketType = 3
+	// PacketTypeServerCleartext is the packet type of a Server Cleartext packet
+	PacketTypeServerCleartext PacketType = 4
+	// PacketTypeClientCleartext is the packet type of a Client Cleartext packet
+	PacketTypeClientCleartext PacketType = 5
+	// PacketType0RTT is the packet type of a 0-RTT packet
+	PacketType0RTT PacketType = 6
+)
+
 // A ConnectionID in QUIC
 type ConnectionID uint64
 
@@ -42,12 +60,6 @@ const MaxReceivePacketSize ByteCount = 1452
 // DefaultTCPMSS is the default maximum packet size used in the Linux TCP implementation.
 // Used in QUIC for congestion window computations in bytes.
 const DefaultTCPMSS ByteCount = 1460
-
-// InitialStreamFlowControlWindow is the initial stream-level flow control window for sending
-const InitialStreamFlowControlWindow ByteCount = (1 << 14) // 16 kB
-
-// InitialConnectionFlowControlWindow is the initial connection-level flow control window for sending
-const InitialConnectionFlowControlWindow ByteCount = (1 << 14) // 16 kB
 
 // ClientHelloMinimumSize is the minimum size the server expects an inchoate CHLO to have.
 const ClientHelloMinimumSize = 1024

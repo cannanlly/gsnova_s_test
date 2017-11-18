@@ -190,14 +190,19 @@ func (s *server) Accept() (Session, error) {
 // Close the server
 func (s *server) Close() error {
 	s.sessionsMutex.Lock()
+	var wg sync.WaitGroup
 	for _, session := range s.sessions {
 		if session != nil {
-			s.sessionsMutex.Unlock()
-			_ = session.Close(nil)
-			s.sessionsMutex.Lock()
+			wg.Add(1)
+			go func(sess packetHandler) {
+				// session.Close() blocks until the CONNECTION_CLOSE has been sent and the run-loop has stopped
+				_ = sess.Close(nil)
+				wg.Done()
+			}(session)
 		}
 	}
 	s.sessionsMutex.Unlock()
+	wg.Wait()
 
 	if s.conn == nil {
 		return nil
@@ -266,15 +271,21 @@ func (s *server) handlePacket(pconn net.PacketConn, remoteAddr net.Addr, packet 
 		return nil
 	}
 
-	// Send Version Negotiation Packet if the client is speaking a different protocol version
+	// send a Version Negotiation Packet if the client is speaking a different protocol version
+	// since the client send a Public Header (only gQUIC has a Version Flag), we need to send a gQUIC Version Negotiation Packet
 	if hdr.VersionFlag && !protocol.IsSupportedVersion(s.config.Versions, hdr.Version) {
 		// drop packets that are too small to be valid first packets
 		if len(packet) < protocol.ClientHelloMinimumSize+len(hdr.Raw) {
 			return errors.New("dropping small packet with unknown version")
 		}
-		// TODO(894): send a IETF draft style Version Negotiation Packets
 		utils.Infof("Client offered version %s, sending VersionNegotiationPacket", hdr.Version)
-		_, err = pconn.WriteTo(wire.ComposeVersionNegotiation(hdr.ConnectionID, s.config.Versions), remoteAddr)
+		if _, err := pconn.WriteTo(wire.ComposeGQUICVersionNegotiation(hdr.ConnectionID, s.config.Versions), remoteAddr); err != nil {
+			return err
+		}
+	}
+	// send an IETF draft style Version Negotiation Packet, if the client sent an unsupported version with an IETF draft style header
+	if hdr.Type == protocol.PacketTypeInitial && !protocol.IsSupportedVersion(s.config.Versions, hdr.Version) {
+		_, err := pconn.WriteTo(wire.ComposeVersionNegotiation(hdr.ConnectionID, hdr.PacketNumber, s.config.Versions), remoteAddr)
 		return err
 	}
 
@@ -304,7 +315,7 @@ func (s *server) handlePacket(pconn net.PacketConn, remoteAddr net.Addr, packet 
 		go func() {
 			// session.run() returns as soon as the session is closed
 			_ = session.run()
-			s.removeConnection(hdr.ConnectionID)
+			s.removeConnection(connID)
 		}()
 
 		go func() {

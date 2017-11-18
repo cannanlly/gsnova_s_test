@@ -278,7 +278,7 @@ func (c *client) handlePacket(remoteAddr net.Addr, packet []byte) {
 		}
 		pr, err := wire.ParsePublicReset(r)
 		if err != nil {
-			utils.Infof("Received a Public Reset for connection %x. An error occurred parsing the packet.")
+			utils.Infof("Received a Public Reset. An error occurred parsing the packet: %s", err)
 			return
 		}
 		utils.Infof("Received Public Reset, rejected packet number: %#x.", pr.RejectedPacketNumber)
@@ -286,24 +286,27 @@ func (c *client) handlePacket(remoteAddr net.Addr, packet []byte) {
 		return
 	}
 
-	// ignore delayed / duplicated version negotiation packets
-	if (c.receivedVersionNegotiationPacket || c.versionNegotiated) && hdr.VersionFlag {
-		return
-	}
+	isVersionNegotiationPacket := hdr.VersionFlag /* gQUIC Version Negotiation Packet */ || hdr.Type == protocol.PacketTypeVersionNegotiation /* IETF draft style Version Negotiation Packet */
 
-	// this is the first packet after the client sent a packet with the VersionFlag set
-	// if the server doesn't send a version negotiation packet, it supports the suggested version
-	if !hdr.VersionFlag && !c.versionNegotiated {
-		c.versionNegotiated = true
-		close(c.versionNegotiationChan)
-	}
+	// handle Version Negotiation Packets
+	if isVersionNegotiationPacket {
+		// ignore delayed / duplicated version negotiation packets
+		if c.receivedVersionNegotiationPacket || c.versionNegotiated {
+			return
+		}
 
-	if hdr.VersionFlag {
 		// version negotiation packets have no payload
-		if err := c.handlePacketWithVersionFlag(hdr); err != nil {
+		if err := c.handleVersionNegotiationPacket(hdr); err != nil {
 			c.session.Close(err)
 		}
 		return
+	}
+
+	// this is the first packet we are receiving
+	// since it is not a Version Negotiation Packet, this means the server supports the suggested version
+	if !c.versionNegotiated {
+		c.versionNegotiated = true
+		close(c.versionNegotiationChan)
 	}
 
 	c.session.handlePacket(&receivedPacket{
@@ -314,7 +317,7 @@ func (c *client) handlePacket(remoteAddr net.Addr, packet []byte) {
 	})
 }
 
-func (c *client) handlePacketWithVersionFlag(hdr *wire.Header) error {
+func (c *client) handleVersionNegotiationPacket(hdr *wire.Header) error {
 	for _, v := range hdr.SupportedVersions {
 		if v == c.version {
 			// the version negotiation packet contains the version that we offered
@@ -326,8 +329,8 @@ func (c *client) handlePacketWithVersionFlag(hdr *wire.Header) error {
 
 	c.receivedVersionNegotiationPacket = true
 
-	newVersion := protocol.ChooseSupportedVersion(c.config.Versions, hdr.SupportedVersions)
-	if newVersion == protocol.VersionUnsupported {
+	newVersion, ok := protocol.ChooseSupportedVersion(c.config.Versions, hdr.SupportedVersions)
+	if !ok {
 		return qerr.InvalidVersion
 	}
 
@@ -350,6 +353,7 @@ func (c *client) handlePacketWithVersionFlag(hdr *wire.Header) error {
 
 func (c *client) createNewSession(initialVersion protocol.VersionNumber, negotiatedVersions []protocol.VersionNumber) error {
 	var err error
+	utils.Debugf("createNewSession with initial version %s", initialVersion)
 	c.session, c.handshakeChan, err = newClientSession(
 		c.conn,
 		c.hostname,

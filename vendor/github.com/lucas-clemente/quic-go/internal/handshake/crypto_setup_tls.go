@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 
 	"github.com/bifurcation/mint"
@@ -36,9 +37,11 @@ func NewCryptoSetupTLSServer(
 	cryptoStream io.ReadWriter,
 	connID protocol.ConnectionID,
 	tlsConfig *tls.Config,
+	remoteAddr net.Addr,
 	params *TransportParameters,
 	paramsChan chan<- TransportParameters,
 	aeadChanged chan<- protocol.EncryptionLevel,
+	checkCookie func(net.Addr, *Cookie) bool,
 	supportedVersions []protocol.VersionNumber,
 	version protocol.VersionNumber,
 ) (CryptoSetup, error) {
@@ -46,7 +49,16 @@ func NewCryptoSetupTLSServer(
 	if err != nil {
 		return nil, err
 	}
-	conn := &fakeConn{stream: cryptoStream, pers: protocol.PerspectiveServer}
+	mintConf.RequireCookie = true
+	mintConf.CookieHandler, err = newCookieHandler(checkCookie)
+	if err != nil {
+		return nil, err
+	}
+	conn := &fakeConn{
+		stream:     cryptoStream,
+		pers:       protocol.PerspectiveServer,
+		remoteAddr: remoteAddr,
+	}
 	mintConn := mint.Server(conn, mintConf)
 	eh := newExtensionHandlerServer(params, paramsChan, supportedVersions, version)
 	if err := mintConn.SetExtensionHandler(eh); err != nil {
@@ -86,7 +98,10 @@ func NewCryptoSetupTLSClient(
 		return nil, err
 	}
 	mintConf.ServerName = hostname
-	conn := &fakeConn{stream: cryptoStream, pers: protocol.PerspectiveClient}
+	conn := &fakeConn{
+		stream: cryptoStream,
+		pers:   protocol.PerspectiveClient,
+	}
 	mintConn := mint.Client(conn, mintConf)
 	eh := newExtensionHandlerClient(params, paramsChan, initialVersion, supportedVersions, version)
 	if err := mintConn.SetExtensionHandler(eh); err != nil {
@@ -105,7 +120,7 @@ func NewCryptoSetupTLSClient(
 		nullAEAD:       nullAEAD,
 		keyDerivation:  crypto.DeriveAESKeys,
 		aeadChanged:    aeadChanged,
-		nextPacketType: protocol.PacketTypeClientInitial,
+		nextPacketType: protocol.PacketTypeInitial,
 	}, nil
 }
 
@@ -196,9 +211,9 @@ func (h *cryptoSetupTLS) determineNextPacketType() error {
 	if h.perspective == protocol.PerspectiveServer {
 		switch state {
 		case "ServerStateStart": // if we're still at ServerStateStart when writing the first packet, that means we've come back to that state by sending a HelloRetryRequest
-			h.nextPacketType = protocol.PacketTypeServerStatelessRetry
+			h.nextPacketType = protocol.PacketTypeRetry
 		case "ServerStateWaitFinished":
-			h.nextPacketType = protocol.PacketTypeServerCleartext
+			h.nextPacketType = protocol.PacketTypeCleartext
 		default:
 			// TODO: accept 0-RTT data
 			return fmt.Errorf("Unexpected handshake state: %s", state)
@@ -207,7 +222,7 @@ func (h *cryptoSetupTLS) determineNextPacketType() error {
 	}
 	// client
 	if state != "ClientStateWaitSH" {
-		h.nextPacketType = protocol.PacketTypeClientCleartext
+		h.nextPacketType = protocol.PacketTypeCleartext
 	}
 	return nil
 }

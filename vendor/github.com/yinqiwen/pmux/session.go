@@ -24,7 +24,7 @@ type Session struct {
 	config       *Config
 	conn         io.ReadWriteCloser
 	connReader   *bufio.Reader
-	connWriter   *bufio.Writer
+	connWriter   io.Writer
 	// bufRead is a buffered reader
 	//bufRead  *bufio.Reader
 	//streams    map[uint32]*Stream
@@ -44,6 +44,7 @@ type Session struct {
 	handshakeDone bool
 
 	cryptoContext *CryptoContext
+	lastRecvTime  time.Time
 }
 
 // keepalive is a long running goroutine that periodically does
@@ -79,7 +80,10 @@ func (s *Session) Ping() (time.Duration, error) {
 	select {
 	case <-s.pingCh:
 	case <-time.After(s.config.PingTimeout):
-		return 0, ErrTimeout
+		if time.Now().Sub(s.lastRecvTime) >= s.config.PingTimeout {
+			return 0, ErrTimeout
+		}
+		return s.config.PingTimeout, nil
 	case <-s.shutdownCh:
 		return 0, ErrSessionShutdown
 	}
@@ -248,6 +252,7 @@ func (s *Session) recvLoop() error {
 			}
 			return err
 		}
+		s.lastRecvTime = time.Now()
 		//log.Printf("####Recv %d", frame.Header.Flags())
 		// Switch on the type
 		switch frame.Header().Flags() {
@@ -340,9 +345,6 @@ func (s *Session) send() {
 				if nil != err {
 					break
 				}
-			}
-			if nil == err {
-				s.connWriter.Flush()
 			}
 		}
 		for _, frame := range frs {
@@ -452,7 +454,7 @@ func newSession(config *Config, conn io.ReadWriteCloser, client bool) *Session {
 		// logger:     log.New(config.LogOutput, "", log.LstdFlags),
 		conn:       conn,
 		connReader: bufio.NewReader(conn),
-		connWriter: bufio.NewWriter(conn),
+		connWriter: conn,
 		// pings:      make(map[uint32]chan struct{}),
 		//streams: make(map[uint32]*Stream),
 		// inflight:   make(map[uint32]struct{}),
